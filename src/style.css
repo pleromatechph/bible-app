@@ -64,12 +64,34 @@ body,
 .sub-tab,
 .progress-card,
 .main-bottom-nav,
-.bottom-sheet,
 .selection-modal,
 .favorite-verse-card,
 .modal-list-item,
 .toast-popup {
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease !important;
+}
+
+#settingsSheetModal,
+#favoritesSheetModal,
+#offlineLibraryModal,
+#profileSheetModal,
+#donateSheetModal,
+#feedbackSheetModal,
+#versionSheetModal,
+#verseActionSheetModal {
+  transition: transform 0.2s ease !important;
+}
+
+/* Instant solid background for full-screen sheets to eliminate flickering */
+#settingsSheetModal,
+#favoritesSheetModal,
+#offlineLibraryModal,
+#profileSheetModal,
+#donateSheetModal,
+#feedbackSheetModal,
+#versionSheetModal,
+#verseActionSheetModal {
+  transition: transform 0.2s ease !important;
 }
 
 body {
@@ -176,9 +198,10 @@ body {
   cursor: pointer;
 }
 
-.clickable-progress:hover {
-  border-color: var(--accent-blue);
-  background-color: var(--deck-bg);
+.clickable-progress:hover,
+.clickable-progress:active {
+  border-color: var(--border-color);
+  background-color: var(--card-bg);
 }
 
 /* Left Abbreviation Box */
@@ -850,6 +873,17 @@ body {
   flex-direction: column !important;
 }
 
+#settingsSheetModal.open,
+#offlineLibraryModal.open,
+#favoritesSheetModal.open,
+#profileSheetModal.open,
+#donateSheetModal.open,
+#feedbackSheetModal.open,
+#versionSheetModal.open,
+#verseActionSheetModal.open {
+  display: flex !important;
+}
+
 #settingsSheetModal,
 #offlineLibraryModal,
 #favoritesSheetModal,
@@ -873,6 +907,9 @@ body {
   flex-direction: column !important;
   z-index: 9999 !important;
   background-color: var(--bg-color) !important;
+  will-change: transform, opacity;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 .modal-list-group {
@@ -953,9 +990,35 @@ body {
   padding-bottom: 24px !important;
 }
 
-#selectionModal,
-.selection-modal,
+/* FIX: Font Size Bottom Sheet Modal Styling */
 #fontSizeSheetModal {
+  position: fixed !important;
+  top: auto !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  height: auto !important;
+  max-height: 220px !important;
+  border-top-left-radius: 20px !important;
+  border-top-right-radius: 20px !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  padding: 16px 20px 28px 20px !important;
+  background-color: var(--card-bg) !important;
+  color: var(--text-color) !important;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.25) !important;
+  z-index: 100001 !important;
+  display: none;
+  flex-direction: column !important;
+}
+
+#fontSizeSheetModal.open {
+  display: flex !important;
+}
+
+#selectionModal,
+.selection-modal {
   height: auto !important;
   max-height: 60vh !important;
   top: auto !important;
@@ -984,7 +1047,7 @@ body {
   border-radius: 0 !important;
   padding: calc(env(safe-area-inset-top, 0px) + 20px) 20px 20px 20px !important;
   box-sizing: border-box !important;
-  z-index: 500 !important;
+  z-index: 99999 !important;
   display: none;
   flex-direction: column !important;
   background-color: var(--bg-color) !important;
@@ -1033,11 +1096,18 @@ body {
   padding: 0 16px !important;
   font-size: 0.9rem !important;
   font-weight: 700 !important;
-  border-radius: 8px !important;
-  margin-top: auto !important;
-  margin-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px) !important;
+  border-radius: 10px !important;
+  margin-top: 12px !important;
+  margin-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px) !important;
   width: 100% !important;
   box-sizing: border-box !important;
+}
+
+#noteEditViewContainer {
+  flex: 1 !important;
+  display: none;
+  flex-direction: column !important;
+  min-height: 0 !important;
 }
 
 .close-btn {
@@ -1262,7 +1332,7 @@ body {
   border-radius: 9999px;
   font-size: 0.85rem;
   font-weight: 700;
-  z-index: 9999;
+  z-index: 100000 !important;
   opacity: 0;
   pointer-events: none;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);

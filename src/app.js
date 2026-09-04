@@ -394,6 +394,26 @@ if (themeToggleBtn) {
 const savedTheme = localStorage.getItem('sog_active_theme') || 'theme-light';
 applyAppTheme(savedTheme);
 
+// Theme Modal Selection Listeners
+const themeSheetModal = document.getElementById('themeSheetModal');
+const closeThemeSheetBtn = document.getElementById('closeThemeSheetBtn');
+
+if (closeThemeSheetBtn) {
+  closeThemeSheetBtn.addEventListener('click', () => {
+    closeSubSheetToSettings(themeSheetModal);
+  });
+}
+
+document.querySelectorAll('.theme-item-card').forEach(card => {
+  card.addEventListener('click', () => {
+    const themeVal = card.getAttribute('data-theme-val');
+    if (themeVal) {
+      applyAppTheme(themeVal);
+      closeSubSheetToSettings(themeSheetModal);
+    }
+  });
+});
+
 if (drawerOverlay) {
   drawerOverlay.addEventListener('click', () => {
     closeAllModals();
@@ -569,17 +589,6 @@ function openDownloadManagerSheet() {
   if (drawerOverlay) drawerOverlay.classList.add('open');
 
   renderDownloadManagerContent();
-  requestAnimationFrame(() => {
-    const formattedKey = selectedBook.book.replace(/\s+/g, '_');
-    const targetRow = document.getElementById(`bookAudioRow_${formattedKey}`);
-    if (targetRow) {
-      targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      targetRow.style.backgroundColor = 'var(--fav-highlight-bg)';
-      setTimeout(() => {
-        targetRow.style.backgroundColor = '';
-      }, 1500);
-    }
-  });
 }
 
 if (downloadAudioBtn) {
@@ -736,6 +745,9 @@ function renderDownloadManagerContent() {
 
 async function updateDownloadedTranslationsState(validTranslations) {
   const installedVersions = await getDownloadedVersions();
+  const downloadedRows = [];
+  const notDownloadedRows = [];
+
   validTranslations.forEach(item => {
     const isInstalled = installedVersions.includes(item.code);
     const isNiv = item.code === 'NIV + Audio' || item.code === 'NIV';
@@ -772,73 +784,105 @@ async function updateDownloadedTranslationsState(validTranslations) {
         }
       }
     }
+
+    if (isInstalled || item.default) {
+      downloadedRows.push(rowEl);
+    } else {
+      notDownloadedRows.push(rowEl);
+    }
   });
+
+  const container = document.getElementById('downloadManagerBody');
+  if (container) {
+    downloadedRows.forEach(row => container.appendChild(row));
+    notDownloadedRows.forEach(row => container.appendChild(row));
+  }
+
   refreshIcons();
 }
 
 async function checkAllBooksAudioStatus() {
-  if (!('caches' in window)) return;
-  const cache = await caches.open(AUDIO_CACHE_NAME);
-  const NEW_TESTAMENT_BOOKS = [
-    "matthew", "mark", "luke", "john", "acts", "romans", "1 corinthians", "2 corinthians",
-    "galatians", "ephesians", "philippians", "colossians", "1 thessalonians", "2 thessalonians",
-    "1 timothy", "2 timothy", "titus", "philemon", "hebrews", "james", "1 peter", "2 peter",
-    "1 john", "2 john", "3 john", "jude", "revelation"
-  ];
+  try {
+    if (!('caches' in window)) return;
+    const cache = await caches.open(AUDIO_CACHE_NAME);
+    const requests = await cache.keys();
+    const cachedUrls = new Set(requests.map(req => req.url));
 
-  for (const b of bibleData) {
-    const formattedKey = b.book.replace(/\s+/g, '_');
-    const slot = document.getElementById(`audioSlot_${formattedKey}`);
-    const subLabel = document.getElementById(`audioSub_${formattedKey}`);
-    if (!slot) continue;
+    const NEW_TESTAMENT_BOOKS = [
+      "matthew", "mark", "luke", "john", "acts", "romans", "1 corinthians", "2 corinthians",
+      "galatians", "ephesians", "philippians", "colossians", "1 thessalonians", "2 thessalonians",
+      "1 timothy", "2 timothy", "titus", "philemon", "hebrews", "james", "1 peter", "2 peter",
+      "1 john", "2 john", "3 john", "jude", "revelation"
+    ];
 
-    const isNT = NEW_TESTAMENT_BOOKS.includes(b.book.toLowerCase());
-    const formattedBook = b.book.toLowerCase().replace(/\s+/g, '_');
-    const sizeStr = audioBookSizes[b.book] ? ` (${audioBookSizes[b.book]})` : '';
-    let downloadedCount = 0;
+    const downloadedRows = [];
+    const notDownloadedRows = [];
 
-    for (let ch = 1; ch <= b.chapters; ch++) {
-      const formattedChapter = String(ch).padStart(2, '0');
-      const fileName = `${formattedBook}_chapter_${formattedChapter}.mp3`;
-      const url = getAudioStreamUrl(isNT, fileName);
-      const match = await cache.match(url);
-      if (match) downloadedCount++;
+    for (const b of bibleData) {
+      const formattedKey = b.book.replace(/\s+/g, '_');
+      const slot = document.getElementById(`audioSlot_${formattedKey}`);
+      const subLabel = document.getElementById(`audioSub_${formattedKey}`);
+      const rowEl = document.getElementById(`bookAudioRow_${formattedKey}`);
+      if (!slot) continue;
+
+      const isNT = NEW_TESTAMENT_BOOKS.includes(b.book.toLowerCase());
+      const formattedBook = b.book.toLowerCase().replace(/\s+/g, '_');
+      const sizeStr = audioBookSizes[b.book] ? ` (${audioBookSizes[b.book]})` : '';
+      let downloadedCount = 0;
+
+      for (let ch = 1; ch <= b.chapters; ch++) {
+        const formattedChapter = String(ch).padStart(2, '0');
+        const fileName = `${formattedBook}_chapter_${formattedChapter}.mp3`;
+        const url = getAudioStreamUrl(isNT, fileName);
+        if (cachedUrls.has(url)) downloadedCount++;
+      }
+
+      if (activeDownloadControllers[formattedKey]) continue;
+
+      if (downloadedCount === b.chapters) {
+        if (subLabel) {
+          subLabel.textContent = `${b.chapters}/${b.chapters} Chapters (Downloaded)${sizeStr}`;
+          subLabel.style.color = 'var(--icon-neutral)';
+        }
+        slot.innerHTML = `
+          <button class="icon-btn delete-audio-book-btn" onclick="deleteBookAudioDownload('${b.book}')" style="color: var(--danger-color); padding: 6px;" title="Delete Offline Audio">
+            ${SVG_TRASH_ICON}
+          </button>
+        `;
+        if (rowEl) downloadedRows.push(rowEl);
+      } else if (downloadedCount > 0) {
+        const pct = Math.round((downloadedCount / b.chapters) * 100);
+        if (subLabel) {
+          subLabel.textContent = `Downloaded ${downloadedCount}/${b.chapters} Chapters (${pct}%)${sizeStr}`;
+          subLabel.style.color = 'var(--accent-blue)';
+        }
+        slot.innerHTML = `
+          <button class="download-action-btn" onclick="triggerBookAudioDownload('${b.book}')" title="Resume Download">
+            ${SVG_DOWNLOAD_ICON}
+          </button>
+        `;
+        if (rowEl) downloadedRows.push(rowEl);
+      } else {
+        if (subLabel) {
+          subLabel.textContent = `${b.chapters} Chapters Audio Track${sizeStr}`;
+          subLabel.style.color = 'var(--icon-neutral)';
+        }
+        slot.innerHTML = `
+          <button class="download-action-btn" onclick="triggerBookAudioDownload('${b.book}')">
+            ${SVG_DOWNLOAD_ICON}
+          </button>
+        `;
+        if (rowEl) notDownloadedRows.push(rowEl);
+      }
     }
 
-    if (activeDownloadControllers[formattedKey]) continue;
-
-    if (downloadedCount === b.chapters) {
-      if (subLabel) {
-        subLabel.textContent = `${b.chapters}/${b.chapters} Chapters (Downloaded)${sizeStr}`;
-        subLabel.style.color = 'var(--icon-neutral)';
-      }
-      slot.innerHTML = `
-        <button class="icon-btn delete-audio-book-btn" onclick="deleteBookAudioDownload('${b.book}')" style="color: var(--danger-color); padding: 6px;" title="Delete Offline Audio">
-          ${SVG_TRASH_ICON}
-        </button>
-      `;
-    } else if (downloadedCount > 0) {
-      const pct = Math.round((downloadedCount / b.chapters) * 100);
-      if (subLabel) {
-        subLabel.textContent = `Downloaded ${downloadedCount}/${b.chapters} Chapters (${pct}%)${sizeStr}`;
-        subLabel.style.color = 'var(--accent-blue)';
-      }
-      slot.innerHTML = `
-        <button class="download-action-btn" onclick="triggerBookAudioDownload('${b.book}')" title="Resume Download">
-          ${SVG_DOWNLOAD_ICON}
-        </button>
-      `;
-    } else {
-      if (subLabel) {
-        subLabel.textContent = `${b.chapters} Chapters Audio Track${sizeStr}`;
-        subLabel.style.color = 'var(--icon-neutral)';
-      }
-      slot.innerHTML = `
-        <button class="download-action-btn" onclick="triggerBookAudioDownload('${b.book}')">
-          ${SVG_DOWNLOAD_ICON}
-        </button>
-      `;
+    const listContainer = document.getElementById('scrollableAudioBooksList');
+    if (listContainer) {
+      downloadedRows.forEach(row => listContainer.appendChild(row));
+      notDownloadedRows.forEach(row => listContainer.appendChild(row));
     }
+  } catch (err) {
+    console.warn("Audio cache checking error safely caught:", err);
   }
 }
 
@@ -1770,7 +1814,9 @@ document.querySelectorAll('.dashboard-filter-tabs .sub-tab').forEach(tab => {
 });
 
 if (readerOptionsBtn) {
-  readerOptionsBtn.addEventListener('click', () => {
+  readerOptionsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeAllModals();
     if (fontSizeSheetModal) fontSizeSheetModal.classList.add('open');
     if (drawerOverlay) drawerOverlay.classList.add('open');
   });
@@ -2259,7 +2305,17 @@ function openNotePreviewSheet(itemKey, book, ch, verse, verseText, noteText) {
   initialPreviewNoteText = noteText || '';
 
   if (previewVerseRefText) previewVerseRefText.textContent = cleanRef;
-  if (previewNoteBodyText) previewNoteBodyText.textContent = initialPreviewNoteText || 'No personal reflection note written.';
+  if (previewNoteBodyText) {
+    if (!initialPreviewNoteText || initialPreviewNoteText.trim() === '') {
+      previewNoteBodyText.textContent = 'No personal reflection note written';
+      previewNoteBodyText.style.fontStyle = 'italic';
+      previewNoteBodyText.style.color = 'var(--icon-neutral)';
+    } else {
+      previewNoteBodyText.textContent = initialPreviewNoteText;
+      previewNoteBodyText.style.fontStyle = 'normal';
+      previewNoteBodyText.style.color = 'var(--text-color)';
+    }
+  }
   if (previewNoteInput) previewNoteInput.value = initialPreviewNoteText;
 
   if (previewVerseContentText) {
@@ -2314,10 +2370,12 @@ if (saveNoteFromPreviewBtn) {
 
     if (updatedNoteText === '') return;
 
+    const isExisting = initialPreviewNoteText && initialPreviewNoteText.trim() !== '';
     saveVerseNote(book, chapter, verse, updatedNoteText);
     initialPreviewNoteText = updatedNoteText;
     if (notePreviewSheetModal) notePreviewSheetModal.classList.remove('open');
-    showToast("Reflection note updated successfully!");
+    if (drawerOverlay) drawerOverlay.classList.remove('open');
+    showToast(isExisting ? "Note Updated!" : "Note Saved!");
     renderDashboardFavorites();
     loadChapterVerses(selectedBook.book, selectedChapter);
   });
@@ -2508,10 +2566,11 @@ if (saveVerseNoteBtn) {
 
     if (noteText.trim() === '') return;
 
+    const isExisting = hasVerseNote(book, chapter, verse);
     saveVerseNote(book, chapter, verse, noteText);
     initialActionNoteText = noteText.trim();
 
-    showToast("New Reflection Note Saved!");
+    showToast(isExisting ? "Note Updated!" : "Note Saved!");
     clearVerseHighlights();
     closeAllModals();
     loadChapterVerses(selectedBook.book, selectedChapter);
@@ -2692,12 +2751,10 @@ if (openFavoritesModalOption) {
   openFavoritesModalOption.addEventListener('click', (e) => {
     e.stopPropagation();
     openedFromSettings = true;
-    if (settingsSheetModal) settingsSheetModal.classList.remove('open');
     renderDashboardFavorites();
-    setTimeout(() => {
-      if (favoritesSheetModal) favoritesSheetModal.classList.add('open');
-      if (drawerOverlay) drawerOverlay.classList.add('open');
-    }, 50);
+    if (favoritesSheetModal) favoritesSheetModal.classList.add('open');
+    if (settingsSheetModal) settingsSheetModal.classList.remove('open');
+    if (drawerOverlay) drawerOverlay.classList.add('open');
   });
 }
 
