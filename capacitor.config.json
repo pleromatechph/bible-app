@@ -6,5 +6,12 @@
   "server": {
     "androidScheme": "https",
     "cleartext": true
+  },
+  "plugins": {
+    "CapacitorUpdater": {
+      "autoUpdate": true,
+      "statsUrl": "",
+      "resetWhenUpdate": false
+    }
   }
 }

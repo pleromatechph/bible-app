@@ -1,6 +1,6 @@
 {
   "name": "bible-app",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Bible web app with NIV audio sync and multi-translation text",
   "main": "index.js",
   "scripts": {
@@ -23,6 +23,7 @@
   "dependencies": {
     "@capacitor/android": "^8.5.1",
     "@capacitor/cli": "^8.5.1",
-    "@capacitor/core": "^8.5.1"
+    "@capacitor/core": "^8.5.1",
+    "@capgo/capacitor-updater": "^7.0.0"
   }
 }
