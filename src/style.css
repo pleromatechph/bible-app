@@ -572,27 +572,71 @@ body {
   margin: 4px 0;
 }
 
+/* Sleek 5.5px Progress Slider sa Maximized Deck */
 .deck-slider {
   width: 100%;
-  height: 2.5px;
+  height: 5.5px;
   accent-color: var(--accent-blue);
   cursor: pointer;
-  border-radius: 2px;
+  border-radius: 999px;
   outline: none;
   background: var(--border-color);
-  transition: height 0.15s ease;
+  transition: all 0.2s ease;
 }
 
 .deck-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 8px;
-  height: 8px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: var(--accent-blue);
   cursor: pointer;
   border: none;
-  box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4);
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+}
+
+/* Spotify-Style Spinning Ring para sa Mini Player */
+@keyframes spinRingAnimation {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.spinner-ring {
+  width: 22px;
+  height: 22px;
+  border: 3px solid rgba(43, 91, 132, 0.2);
+  border-top: 3px solid var(--accent-blue);
+  border-radius: 50%;
+  animation: spinRingAnimation 0.8s linear infinite;
+  display: inline-block;
+}
+
+/* Traveling Light Beam Wave + Subtle Pulse Animation Combo */
+@keyframes travelingLightWave {
+  0% {
+    background-position: -200% 0;
+    box-shadow: 0 0 4px var(--accent-blue);
+  }
+  50% {
+    box-shadow: 0 0 12px var(--accent-blue);
+  }
+  100% {
+    background-position: 200% 0;
+    box-shadow: 0 0 4px var(--accent-blue);
+  }
+}
+
+.deck-slider.reconnecting {
+  background: linear-gradient(
+    90deg,
+    var(--border-color) 0%,
+    var(--accent-blue) 40%,
+    var(--accent-blue) 60%,
+    var(--border-color) 100%
+  ) !important;
+  background-size: 200% 100% !important;
+  animation: travelingLightWave 1.2s ease-in-out infinite !important;
 }
 
 .time-labels {
@@ -702,10 +746,12 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
+  height: 60px;
+  box-sizing: border-box;
   background-color: var(--deck-bg);
   border-top: 1px solid var(--border-color);
-  padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 12px) 20px;
+  padding: 0 20px calc(env(safe-area-inset-bottom, 0px)) 20px;
   z-index: 9500 !important;
   position: relative !important;
   pointer-events: auto !important;
@@ -740,9 +786,15 @@ body {
   font-weight: 800;
   font-size: 0.95rem;
   letter-spacing: -0.5px;
-  color: var(--text-color);
+  color: var(--icon-neutral);
   padding: 2px 6px;
   border-radius: 6px;
+  transition: color 0.2s ease;
+}
+
+.reader-sub-tab-plain:hover .aa-font-badge,
+.reader-sub-tab-plain.active .aa-font-badge {
+  color: var(--accent-blue);
 }
 
 .floating-mini-player {
@@ -1277,7 +1329,9 @@ body {
   flex-direction: column !important;
   height: calc(100vh - 60px) !important;
   overflow: hidden !important;
-  padding: 0 16px 0 16px !important;
+  padding: 0 20px 0 20px !important;
+  max-width: 100vw;
+  box-sizing: border-box;
 }
 
 .dashboard-sticky-top {
@@ -1576,13 +1630,17 @@ body {
   flex-shrink: 0;
 }
 
-.reading-container,
-.verse-item,
-.verse-num {
-  -webkit-user-select: none !important;
-  -moz-user-select: none !important;
-  -ms-user-select: none !important;
-  user-select: none !important;
+.reading-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 20px 30px 20px;
+  font-family: 'Georgia', serif;
+  font-size: 1.0rem;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  user-select: text;
+  max-width: 100vw;
+  box-sizing: border-box;
 }
 
 #fontSizeSheetModal {
