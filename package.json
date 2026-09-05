@@ -3,10 +3,10 @@
   "version": "1.0.1",
   "description": "Bible web app with NIV audio sync and multi-translation text",
   "main": "index.js",
-  "scripts": {
+"scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "mkdir -p www && cp index.html sw.js www/ && cp -r src www/ && cp -r db www/",
-    "sync": "npm run build && npx cap copy && npx cap sync"
+    "build": "rimraf www && mkdirp www && copyfiles -u 0 index.html style.css app.js sw.js \"src/**/*\" \"db/**/*\" www",
+    "cap:sync": "npm run build && npx cap sync android"
   },
   "repository": {
     "type": "git",
@@ -25,5 +25,10 @@
     "@capacitor/cli": "^8.5.1",
     "@capacitor/core": "^8.5.1",
     "@capgo/capacitor-updater": "^7.0.0"
+  },
+  "devDependencies": {
+    "copyfiles": "^2.4.1",
+    "mkdirp": "^3.0.1",
+    "rimraf": "^6.1.3"
   }
 }

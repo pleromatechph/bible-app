@@ -1662,3 +1662,44 @@ body {
   max-height: 220px !important;
   padding: 14px 20px 20px 20px !important;
 }
+/* RED DOT BADGE FOR UPDATES */
+.update-red-badge {
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 10px;
+  background-color: var(--danger-color);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--danger-color);
+  animation: pulseBadge 1.8s infinite;
+}
+
+@keyframes pulseBadge {
+  0% { transform: translateY(-50%) scale(0.9); opacity: 0.8; }
+  50% { transform: translateY(-50%) scale(1.25); opacity: 1; }
+  100% { transform: translateY(-50%) scale(0.9); opacity: 0.8; }
+}
+
+#updateSheetModal {
+  position: fixed !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  border-radius: 0 !important;
+  padding: calc(env(safe-area-inset-top, 0px) + 20px) 20px 20px 20px !important;
+  box-sizing: border-box !important;
+  display: none;
+  flex-direction: column !important;
+  z-index: 9999 !important;
+  background-color: var(--bg-color) !important;
+}
+
+#updateSheetModal.open {
+  display: flex !important;
+}

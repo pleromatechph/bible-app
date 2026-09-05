@@ -1,0 +1,8 @@
+{
+  "version": "1.0.0",
+  "downloadUrl": "https://github.com/pleromatechph/bible-app/releases/download/v1.0.1/update.zip",
+  "whatsNew": [
+    "Initial release with Bible reader and audio support.",
+    "Bug fixes and performance improvements."
+  ]
+}

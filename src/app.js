@@ -2973,6 +2973,153 @@
   }
 
   initAppStartup();
+// APP VERSION & OTA UPDATE MANAGER
+  const CURRENT_APP_VERSION = "1.0.0";
+  const UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/pleromatechph/bible-app/main/update-manifest.json";
+
+  const updateSheetModal = document.getElementById('updateSheetModal');
+  const closeUpdateSheetBtn = document.getElementById('closeUpdateSheetBtn');
+  const openUpdateOption = document.getElementById('openUpdateOption');
+  const updateBadgeDot = document.getElementById('updateBadgeDot');
+  const inlineUpdateStatus = document.getElementById('inlineUpdateStatus');
+  const updateBtnIcon = document.getElementById('updateBtnIcon');
+  const updateStatusTitle = document.getElementById('updateStatusTitle');
+  const updateVersionLabel = document.getElementById('updateVersionLabel');
+  const whatsNewContainer = document.getElementById('whatsNewContainer');
+  const whatsNewList = document.getElementById('whatsNewList');
+  const downloadOtaUpdateBtn = document.getElementById('downloadOtaUpdateBtn');
+  const updateProgressWrapper = document.getElementById('updateProgressWrapper');
+  const updateProgressBarFill = document.getElementById('updateProgressBarFill');
+  const updateProgressPercent = document.getElementById('updateProgressPercent');
+
+  let latestUpdatePackage = null;
+
+  async function checkForAppUpdates(isManualClick = false) {
+    try {
+      if (isManualClick) {
+        if (inlineUpdateStatus) {
+          inlineUpdateStatus.textContent = "Checking for updates...";
+          inlineUpdateStatus.style.color = "var(--accent-blue)";
+          inlineUpdateStatus.style.display = "block";
+        }
+        if (updateBtnIcon) updateBtnIcon.classList.add('spin-icon');
+      }
+      
+      const response = await fetch(`${UPDATE_MANIFEST_URL}?t=${Date.now()}`);
+      if (!response.ok) throw new Error("Manifest fetch failed");
+      
+      const data = await response.json();
+      latestUpdatePackage = data;
+
+      if (data.version && data.version !== CURRENT_APP_VERSION) {
+        if (updateBadgeDot) updateBadgeDot.style.display = 'block';
+        
+        if (isManualClick) {
+          if (inlineUpdateStatus) inlineUpdateStatus.style.display = "none";
+          if (updateBtnIcon) updateBtnIcon.classList.remove('spin-icon');
+
+          if (updateStatusTitle) updateStatusTitle.textContent = "New Update Available! 🎉";
+          if (updateVersionLabel) updateVersionLabel.textContent = `Current: v${CURRENT_APP_VERSION} ➔ Latest: v${data.version}`;
+          
+          if (whatsNewList && data.whatsNew && Array.isArray(data.whatsNew)) {
+            whatsNewList.innerHTML = data.whatsNew.map(item => `<li>${item}</li>`).join('');
+            if (whatsNewContainer) whatsNewContainer.style.display = 'block';
+          }
+          if (downloadOtaUpdateBtn) downloadOtaUpdateBtn.style.display = 'block';
+
+          // Dito pa lamang lalabas ang Pop-out Modal Sheet kapag may bagong update
+          if (updateSheetModal) updateSheetModal.classList.add('open');
+          if (drawerOverlay) drawerOverlay.classList.add('open');
+        }
+      } else {
+        if (updateBadgeDot) updateBadgeDot.style.display = 'none';
+        if (isManualClick) {
+          if (updateBtnIcon) updateBtnIcon.classList.remove('spin-icon');
+          if (inlineUpdateStatus) {
+            inlineUpdateStatus.textContent = "You're on the latest version! (v" + CURRENT_APP_VERSION + ")";
+            inlineUpdateStatus.style.color = "var(--icon-neutral)";
+            inlineUpdateStatus.style.display = "block";
+            setTimeout(() => {
+              inlineUpdateStatus.style.display = "none";
+            }, 3000);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Update check failed:", err);
+      if (isManualClick) {
+        if (updateBtnIcon) updateBtnIcon.classList.remove('spin-icon');
+        if (inlineUpdateStatus) {
+          inlineUpdateStatus.textContent = "Unable to check updates. Check connection.";
+          inlineUpdateStatus.style.color = "var(--danger-color)";
+          inlineUpdateStatus.style.display = "block";
+          setTimeout(() => {
+            inlineUpdateStatus.style.display = "none";
+          }, 3500);
+        }
+      }
+    }
+  }
+
+  if (openUpdateOption) {
+    openUpdateOption.addEventListener('click', (e) => {
+      e.stopPropagation();
+      checkForAppUpdates(true);
+    });
+  }
+
+  if (closeUpdateSheetBtn) {
+    closeUpdateSheetBtn.addEventListener('click', () => closeSubSheetToSettings(updateSheetModal));
+  }
+
+  if (downloadOtaUpdateBtn) {
+    downloadOtaUpdateBtn.addEventListener('click', async () => {
+      if (!latestUpdatePackage || !latestUpdatePackage.downloadUrl) return;
+
+      downloadOtaUpdateBtn.disabled = true;
+      downloadOtaUpdateBtn.textContent = "Downloading Update...";
+      if (updateProgressWrapper) updateProgressWrapper.style.display = 'flex';
+
+      try {
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorUpdater) {
+          const { CapacitorUpdater } = window.Capacitor.Plugins;
+          
+          CapacitorUpdater.addListener('download', (info) => {
+            if (info.percent !== undefined) {
+              const pct = Math.round(info.percent);
+              if (updateProgressBarFill) updateProgressBarFill.style.width = `${pct}%`;
+              if (updateProgressPercent) updateProgressPercent.textContent = `${pct}%`;
+            }
+          });
+
+          const versionData = await CapacitorUpdater.download({
+            url: latestUpdatePackage.downloadUrl,
+            version: latestUpdatePackage.version
+          });
+
+          downloadOtaUpdateBtn.textContent = "Installing Update...";
+          await CapacitorUpdater.set(versionData);
+          showToast("Update installed successfully! Reloading...");
+        } else {
+          showToast("OTA updates are active only on mobile native build.");
+          setTimeout(() => {
+            if (updateProgressWrapper) updateProgressWrapper.style.display = 'none';
+            downloadOtaUpdateBtn.disabled = false;
+            downloadOtaUpdateBtn.textContent = "Download & Install Update";
+          }, 2000);
+        }
+      } catch (err) {
+        console.error("OTA Download Error:", err);
+        showToast("Update failed to download");
+        downloadOtaUpdateBtn.disabled = false;
+        downloadOtaUpdateBtn.textContent = "Retry Download";
+      }
+    });
+  }
+
+  // Automatic Background Check on Startup
+  checkForAppUpdates(false);
+
   // Live Update Auto-Notification Initialization
   if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorUpdater) {
     const { CapacitorUpdater } = window.Capacitor.Plugins;
