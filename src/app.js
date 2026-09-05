@@ -1,4 +1,4 @@
-  // Complete 66 Bible Books Data
+// Complete 66 Bible Books Data
   const bibleData = [
     { book: "Genesis", chapters: 50 }, { book: "Exodus", chapters: 40 },
     { book: "Leviticus", chapters: 27 }, { book: "Numbers", chapters: 36 },
@@ -456,7 +456,7 @@
         }
         closeAllModals();
         resetDashboardTabToStarted();
-        if (audioElement && audioElement.currentTime > 0 && currentVersion === 'NIV + Audio') {
+        if (audioElement && audioElement.src && currentVersion === 'NIV + Audio') {
           if (miniAudioPlayer) miniAudioPlayer.style.display = 'flex';
         }
       }, 280);
@@ -1470,7 +1470,7 @@
     }
   }
 
-let savedAudioPlaybackPosition = 0;
+  let savedAudioPlaybackPosition = 0;
   let isAudioReconnectingState = false;
 
   function setAudioReconnectingState(isReconnecting) {
@@ -1480,15 +1480,38 @@ let savedAudioPlaybackPosition = 0;
     const readerMiniPlayBtn = document.getElementById('readerMiniPlayBtn');
 
     if (isReconnecting) {
+      // Maximized Player Progress Bar: Travel Light/Pulse Wave (Existing CSS Class)
       if (progressBar) progressBar.classList.add('reconnecting');
-      if (miniPlayBtn) miniPlayBtn.innerHTML = `<div class="spinner-ring"></div>`;
-      if (readerMiniPlayBtn) readerMiniPlayBtn.innerHTML = `<div class="spinner-ring"></div>`;
-      // Panatilihing naka-pause state ang main play button habang nag-reconnect
-      updatePlayIcons(false);
+
+      // Dalawang Mini Players: Infinite Spinner Ring
+      const spinnerHTML = `<div class="spinner-ring"></div>`;
+      if (miniPlayBtn) miniPlayBtn.innerHTML = spinnerHTML;
+      if (readerMiniPlayBtn) readerMiniPlayBtn.innerHTML = spinnerHTML;
+
+      // Maximized Player Main Button: Play Icon
+      const playBtn = document.getElementById('playBtn');
+      if (playBtn) playBtn.innerHTML = `<i data-lucide="play" id="playIcon"></i>`;
+      refreshIcons();
     } else {
       if (progressBar) progressBar.classList.remove('reconnecting');
       updatePlayIcons(!audioElement.paused);
     }
+  }
+
+  function updatePlayIcons(isPlaying) {
+    // Kapag nag-reconnect pa, huwag munang galawin ang spinner at wave animation
+    if (isAudioReconnectingState) return;
+
+    const iconName = isPlaying ? 'pause' : 'play';
+    const playBtn = document.getElementById('playBtn');
+    const miniPlayBtn = document.getElementById('miniPlayBtn');
+    const readerMiniPlayBtn = document.getElementById('readerMiniPlayBtn');
+
+    if (playBtn) playBtn.innerHTML = `<i data-lucide="${iconName}" id="playIcon"></i>`;
+    if (miniPlayBtn) miniPlayBtn.innerHTML = `<i data-lucide="${iconName}" id="miniPlayIcon"></i>`;
+    if (readerMiniPlayBtn) readerMiniPlayBtn.innerHTML = `<i data-lucide="${iconName}" id="readerMiniPlayIcon"></i>`;
+
+    refreshIcons();
   }
 
   async function attemptAudioAutoResume() {
@@ -1516,12 +1539,18 @@ let savedAudioPlaybackPosition = 0;
   function togglePlayPause() {
     if (!audioElement || !audioElement.src) return;
     if (audioElement.paused) {
+      setAudioReconnectingState(true);
       audioElement.play().then(() => {
+        setAudioReconnectingState(false);
         updatePlayIcons(true);
         markChapterStarted(selectedBook.book, selectedChapter);
-      }).catch(err => console.log("Audio play error:", err));
+      }).catch(err => {
+        console.log("Audio play error:", err);
+        setAudioReconnectingState(false);
+      });
     } else {
       audioElement.pause();
+      setAudioReconnectingState(false);
       updatePlayIcons(false);
     }
   }
@@ -1537,23 +1566,38 @@ let savedAudioPlaybackPosition = 0;
     });
 
     audioElement.addEventListener('waiting', () => {
-      if (!navigator.onLine || audioElement.readyState < 3) {
-        setAudioReconnectingState(true);
-      }
+      setAudioReconnectingState(true);
+    });
+
+    audioElement.addEventListener('seeking', () => {
+      setAudioReconnectingState(true);
+    });
+
+    audioElement.addEventListener('stalled', () => {
+      setAudioReconnectingState(true);
     });
 
     audioElement.addEventListener('playing', () => {
       setAudioReconnectingState(false);
     });
 
+    audioElement.addEventListener('canplay', () => {
+      setAudioReconnectingState(false);
+    });
+
+    audioElement.addEventListener('canplaythrough', () => {
+      setAudioReconnectingState(false);
+    });
+
     audioElement.addEventListener('error', () => {
-      if (!navigator.onLine) {
-        setAudioReconnectingState(true);
-      }
+      setAudioReconnectingState(false);
     });
 
     audioElement.addEventListener('timeupdate', () => {
       if (audioElement.currentTime > 0) {
+        if (isAudioReconnectingState && !audioElement.paused) {
+          setAudioReconnectingState(false);
+        }
         savedAudioPlaybackPosition = audioElement.currentTime;
         markChapterStarted(selectedBook.book, selectedChapter);
       }
@@ -1594,6 +1638,7 @@ let savedAudioPlaybackPosition = 0;
     skipBackBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       if (audioElement && audioElement.src) {
+        setAudioReconnectingState(true);
         audioElement.currentTime = Math.max(0, audioElement.currentTime - 10);
       }
     });
@@ -1603,6 +1648,7 @@ let savedAudioPlaybackPosition = 0;
     skipForwardBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       if (audioElement && audioElement.src) {
+        setAudioReconnectingState(true);
         audioElement.currentTime = Math.min(audioElement.duration || 0, audioElement.currentTime + 10);
       }
     });
@@ -1611,6 +1657,7 @@ let savedAudioPlaybackPosition = 0;
   if (progressBar) {
     const seekAudio = () => {
       if (audioElement && audioElement.duration) {
+        setAudioReconnectingState(true);
         const seekTime = (progressBar.value / 100) * audioElement.duration;
         audioElement.currentTime = seekTime;
       }
@@ -1628,18 +1675,6 @@ let savedAudioPlaybackPosition = 0;
       if (audioElement) audioElement.playbackRate = newSpeed;
       speedBtn.textContent = `${newSpeed.toFixed(newSpeed % 1 === 0 ? 1 : 2)}x`;
     });
-  }
-
-  function updatePlayIcons(isPlaying) {
-    const iconName = isPlaying ? 'pause' : 'play';
-    const playIcon = document.getElementById('playIcon');
-    const miniPlayIcon = document.getElementById('miniPlayIcon');
-    const readerMiniPlayIcon = document.getElementById('readerMiniPlayIcon');
-
-    if (playIcon) playIcon.setAttribute('data-lucide', iconName);
-    if (miniPlayIcon) miniPlayIcon.setAttribute('data-lucide', iconName);
-    if (readerMiniPlayIcon) readerMiniPlayIcon.setAttribute('data-lucide', iconName);
-    refreshIcons();
   }
 
   function formatTime(secs) {
@@ -1815,10 +1850,13 @@ let savedAudioPlaybackPosition = 0;
         }
 
         if (wasPlaying) {
+          setAudioReconnectingState(true);
           audioElement.play().then(() => {
+            setAudioReconnectingState(false);
             updatePlayIcons(true);
           }).catch(err => {
             console.warn("Autoplay blocked:", err);
+            setAudioReconnectingState(false);
             updatePlayIcons(false);
           });
         } else {
@@ -1978,7 +2016,7 @@ let savedAudioPlaybackPosition = 0;
         <div class="version-info" style="display: flex; flex-direction: column; flex: 1; cursor: pointer;">
           <span style="font-weight: 600; font-size: 0.9rem;">${item.name}</span>
           <span style="font-size: 0.72rem; color: var(--icon-neutral);">
-            ${item.default ? 'Built-in' : 'Downloaded & Available Offline'}
+            ${item.default ? 'Default' : 'Downloaded & Available Offline'}
           </span>
         </div>
         ${isActive ? `<i data-lucide="check" style="width: 18px; height: 18px; color: var(--accent-blue);"></i>` : ''}
@@ -2844,6 +2882,25 @@ let savedAudioPlaybackPosition = 0;
 
   if (closeDonateSheetBtnRef) {
     closeDonateSheetBtnRef.addEventListener('click', () => closeSubSheetToSettings(donateSheetModal));
+  }
+// DONATE COPY BUTTONS LOGIC
+  const copyGcashBtn = document.getElementById('copyGcashBtn');
+  const copyMaribankBtn = document.getElementById('copyMaribankBtn');
+
+  if (copyGcashBtn) {
+    copyGcashBtn.addEventListener('click', () => {
+      copyTextToClipboard("09231327167", () => {
+        showToast("GCash number copied!");
+      });
+    });
+  }
+
+  if (copyMaribankBtn) {
+    copyMaribankBtn.addEventListener('click', () => {
+      copyTextToClipboard("13956844416", () => {
+        showToast("MariBank account copied!");
+      });
+    });
   }
 
   function showInAppConfirmModal(titleText, bodyText, onConfirmCallback, cancelBtnLabel = "Cancel", proceedBtnLabel = "Discard") {
