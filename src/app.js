@@ -242,15 +242,22 @@ function loadChapterVerses(bookName, chapterNum) {
     const bookIndex = bibleData.findIndex(b => b.book.toLowerCase() === bookName.toLowerCase()) + 1;
     const cleanBookName = bookName.toLowerCase().replace(/\s+/g, '');
     const shortPrefix = cleanBookName.substring(0, 3);
-    const stmt = db.prepare(`SELECT * FROM ${tableName} WHERE LOWER(CAST(book AS TEXT)) = ? OR LOWER(CAST(book AS TEXT)) = ? OR LOWER(CAST(book AS TEXT)) LIKE ?`);
-    stmt.bind([cleanBookName, String(bookIndex), `${shortPrefix}%`]);
+    const bookAliases = getBookAliases(bookName);
+
+    const stmt = db.prepare(`SELECT * FROM ${tableName}`);
 
     let verseCount = 0;
     while (stmt.step()) {
       const row = stmt.getAsObject();
       const rawBookVal = String(row.book !== undefined ? row.book : (row.book_number !== undefined ? row.book_number : (row.book_id !== undefined ? row.book_id : ''))).toLowerCase().trim().replace(/\s+/g, '');
-      const isBookMatch = rawBookVal === cleanBookName || rawBookVal === String(bookIndex) || parseInt(rawBookVal, 10) === bookIndex || (shortPrefix.length >= 2 && rawBookVal.startsWith(shortPrefix));
-      
+
+      // Universal matching strategy: checks exact match, alias, book index, or prefix match
+      const isBookMatch = rawBookVal === cleanBookName ||
+                          rawBookVal === String(bookIndex) ||
+                          parseInt(rawBookVal, 10) === bookIndex ||
+                          bookAliases.includes(rawBookVal) ||
+                          (shortPrefix.length >= 2 && rawBookVal.startsWith(shortPrefix));
+
       if (!isBookMatch) continue;
 
       let currentChap = row.chapter !== undefined ? row.chapter : row.chapter_number;
@@ -292,28 +299,34 @@ function loadChapterVerses(bookName, chapterNum) {
         let formattedContent = '';
 
         if (textVal.includes('\n')) {
-          const lines = textVal.split('\n');
-          const possibleHeading = lines[0].trim();
-          const lastChar = possibleHeading.slice(-1);
+          const lines = textVal.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+          const headerLines = [];
+          let contentLines = [];
 
-          // 1. Walang bantas o quote marks
-          const hasPunctuationOrQuote = ['.', ',', ';', ':', '?', '!', '—', '-', '“', '”', '"', "'"].some(p => possibleHeading.includes(p));
-          
-          // 2. Tinitingnan natin kung halos LAHAT ng salita ay nagsisimula sa Capital Letter (Title Case Check)
-          const words = possibleHeading.split(/\s+/);
-          const capitalizedWords = words.filter(w => /^[A-Z]/.test(w));
-          const isTitleCase = words.length > 0 && (capitalizedWords.length / words.length) >= 0.7;
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const hasSentencePunctuation = ['.', ',', ';', ':', '?', '!', '—', '“', '”', '"'].some(p => line.includes(p));
+            const words = line.split(/\s+/);
+            const capitalizedWords = words.filter(w => /^[A-Z0-9]/.test(w));
+            const isTitleCase = words.length > 0 && (capitalizedWords.length / words.length) >= 0.6;
+            const isHeaderLength = line.length <= 60;
 
-          // 3. Valid Header rule
-          const isHeaderLength = possibleHeading.length > 0 && possibleHeading.length <= 50;
-          const isTrueHeader = !hasPunctuationOrQuote && isHeaderLength && isTitleCase && lines.length > 1;
+            if (!hasSentencePunctuation && isHeaderLength && isTitleCase && i < lines.length - 1) {
+              headerLines.push(line);
+            } else {
+              contentLines = lines.slice(i);
+              break;
+            }
+          }
 
-          if (isTrueHeader) {
-            const verseTextPart = lines.slice(1).join('<br>').trim();
-            const headerDiv = document.createElement('div');
-            headerDiv.className = 'main-section-header';
-            headerDiv.textContent = possibleHeading;
-            versesList.appendChild(headerDiv);
+          if (headerLines.length > 0 && contentLines.length > 0) {
+            headerLines.forEach(hText => {
+              const headerDiv = document.createElement('div');
+              headerDiv.className = 'main-section-header';
+              headerDiv.textContent = hText;
+              versesList.appendChild(headerDiv);
+            });
+            const verseTextPart = contentLines.join('<br>');
             formattedContent = `<span class="verse-num">${currentVerse}</span> ${verseTextPart}`;
           } else {
             formattedContent = `<span class="verse-num">${currentVerse}</span> ${textVal.replace(/\n/g, '<br>')}`;
@@ -388,6 +401,26 @@ function getBookAbbreviation(bookName) {
     return `${parts[0]}${parts[1].substring(0, 2).toUpperCase()}`;
   }
   return cleanName.substring(0, 3).toUpperCase();
+}
+
+function getBookAliases(bookName) {
+  const clean = bookName.toLowerCase().replace(/\s+/g, '');
+  const aliases = [clean];
+  if (clean === 'psalms') aliases.push('psalm', 'psa', 'ps');
+  if (clean === '1kings') aliases.push('1ki', '1kgs', '1king');
+  if (clean === '2kings') aliases.push('2ki', '2kgs', '2king');
+  if (clean === 'james') aliases.push('jas', 'jm');
+  return aliases;
+}
+
+function getBookAliases(bookName) {
+  const clean = bookName.toLowerCase().replace(/\s+/g, '');
+  const aliases = [clean];
+  if (clean === 'psalms') aliases.push('psalm', 'psa', 'ps');
+  if (clean === '1kings') aliases.push('1ki', '1kgs', '1king');
+  if (clean === '2kings') aliases.push('2ki', '2kgs', '2king');
+  if (clean === 'james') aliases.push('jas', 'jm');
+  return aliases;
 }
 
 // Header Quick Toggle Button
