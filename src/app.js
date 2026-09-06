@@ -858,7 +858,8 @@ async function checkAllBooksAudioStatus() {
       if (!slot) continue;
 
       const isNT = NEW_TESTAMENT_BOOKS.includes(b.book.toLowerCase());
-      const formattedBook = b.book.toLowerCase().replace(/\s+/g, '_');
+      let formattedBook = b.book.toLowerCase().replace(/\s+/g, '_');
+      if (formattedBook === 'psalms') formattedBook = 'psalm';
       const sizeStr = audioBookSizes[b.book] ? ` (${audioBookSizes[b.book]})` : '';
       let downloadedCount = 0;
 
@@ -943,7 +944,8 @@ window.triggerBookAudioDownload = async function(bookName) {
     "1 john", "2 john", "3 john", "jude", "revelation"
   ];
   const isNT = NEW_TESTAMENT_BOOKS.includes(targetBookObj.book.toLowerCase());
-  const formattedBook = targetBookObj.book.toLowerCase().replace(/\s+/g, '_');
+  let formattedBook = targetBookObj.book.toLowerCase().replace(/\s+/g, '_');
+  if (formattedbook === 'psalms') formattedbook = 'psalm';
 
   try {
     const cache = await caches.open(AUDIO_CACHE_NAME);
@@ -1023,7 +1025,8 @@ window.deleteBookAudioDownload = async function(bookName) {
         "1 john", "2 john", "3 john", "jude", "revelation"
       ];
       const isNT = NEW_TESTAMENT_BOOKS.includes(targetBookObj.book.toLowerCase());
-      const formattedBook = targetBookObj.book.toLowerCase().replace(/\s+/g, '_');
+      let formattedBook = targetBookObj.book.toLowerCase().replace(/\s+/g, '_');
+      if (formattedBook === 'psalms') formattedBook = 'psalm';
       const cache = await caches.open(AUDIO_CACHE_NAME);
 
       for (let ch = 1; ch <= targetBookObj.chapters; ch++) {
@@ -1569,22 +1572,25 @@ function updatePlayIcons(isPlaying) {
   refreshIcons();
 }
 
-// Infinite Auto-Resume Reconnection Loop
+// Infinite Auto-Resume Reconnection Loop (WebView Safe)
 async function attemptAudioAutoResume() {
   if (!audioElement || !audioElement.src || currentVersion !== 'NIV + Audio') return;
   
   setAudioReconnectingState(true);
+
+  // Huwag tawagin ang load() kapag offline para hindi ma-freeze ang Android WebView
+  if (!navigator.onLine) {
+    return;
+  }
+
   try {
-    audioElement.load();
     if (savedAudioPlaybackPosition > 0) {
       audioElement.currentTime = savedAudioPlaybackPosition;
     }
     await audioElement.play();
     setAudioReconnectingState(false);
   } catch (err) {
-    console.warn("Reconnection failed, retrying indefinitely...", err);
-    // Infinite Retry kada 2.5 seconds hangga't hindi nakaka-reconnect
-    setTimeout(attemptAudioAutoResume, 2500);
+    console.warn("Reconnection failed, waiting for connection...", err);
   }
 }
 
@@ -1595,6 +1601,7 @@ window.addEventListener('online', () => {
 });  
 
 function togglePlayPause() {
+  console.log("PLAY BUTTON CLICKED - CURRENT AUDIO SRC:", audioElement ? audioElement.src : "NO AUDIO ELEMENT");
   if (!audioElement || !audioElement.src) return;
   if (audioElement.paused) {
     setAudioReconnectingState(true);
@@ -1890,11 +1897,14 @@ async function updateDisplay(forceAutoPlay = false) {
     "1 timothy", "2 timothy", "titus", "philemon", "hebrews", "james", "1 peter", "2 peter",
     "1 john", "2 john", "3 john", "jude", "revelation"
   ];
-  const formattedBook = selectedBook.book.toLowerCase().replace(/\s+/g, '_');
-  const formattedChapter = String(selectedChapter).padStart(2, '0');
+  let formattedBook = selectedBook.book.toLowerCase().replace(/\s+/g, '_');
+  if (formattedBook === 'psalms') formattedBook = 'psalm';
+  const padLength = selectedBook.chapters > 99 ? 3 : 2;
+  const formattedChapter = String(selectedChapter).padStart(padLength, '0');
   const fileName = `${formattedBook}_chapter_${formattedChapter}.mp3`;
   const isNT = NEW_TESTAMENT_BOOKS.includes(selectedBook.book.toLowerCase());
   const audioPath = getAudioStreamUrl(isNT, fileName);
+  console.log("AUDIO DEBUG URL:", audioPath);
   const hasAudioSupport = currentVersion === 'NIV + Audio';
 
   if (audioElement) {
