@@ -294,15 +294,24 @@ function loadChapterVerses(bookName, chapterNum) {
         if (textVal.includes('\n')) {
           const lines = textVal.split('\n');
           const possibleHeading = lines[0].trim();
-          const hasBadPunctuation = ['.', ',', ';', ':', '?', '!', '—', '-'].includes(possibleHeading.slice(-1));
-          const isLengthValid = possibleHeading.length > 0 && possibleHeading.length <= 40;
-          const containsSentenceVerbs = /\b(was|were|became|had|did|said|begat|lived)\b/i.test(possibleHeading);
-          const isTrueHeader = isLengthValid && !hasBadPunctuation && !containsSentenceVerbs;
+          const lastChar = possibleHeading.slice(-1);
 
-          if (isTrueHeader && lines.length > 1) {
+          // 1. Walang bantas o quote marks
+          const hasPunctuationOrQuote = ['.', ',', ';', ':', '?', '!', '—', '-', '“', '”', '"', "'"].some(p => possibleHeading.includes(p));
+          
+          // 2. Tinitingnan natin kung halos LAHAT ng salita ay nagsisimula sa Capital Letter (Title Case Check)
+          const words = possibleHeading.split(/\s+/);
+          const capitalizedWords = words.filter(w => /^[A-Z]/.test(w));
+          const isTitleCase = words.length > 0 && (capitalizedWords.length / words.length) >= 0.7;
+
+          // 3. Valid Header rule
+          const isHeaderLength = possibleHeading.length > 0 && possibleHeading.length <= 50;
+          const isTrueHeader = !hasPunctuationOrQuote && isHeaderLength && isTitleCase && lines.length > 1;
+
+          if (isTrueHeader) {
             const verseTextPart = lines.slice(1).join('<br>').trim();
             const headerDiv = document.createElement('div');
-            headerDiv.className = (verseCount === 0) ? 'main-section-header' : 'sub-section-header';
+            headerDiv.className = 'main-section-header';
             headerDiv.textContent = possibleHeading;
             versesList.appendChild(headerDiv);
             formattedContent = `<span class="verse-num">${currentVerse}</span> ${verseTextPart}`;
@@ -1683,6 +1692,47 @@ if (speedBtn) {
   });
 }
 
+function updateMediaSessionMetadata() {
+  if (!('mediaSession' in navigator)) return;
+
+  const currentTitle = `${selectedBook.book} ${selectedChapter}`;
+  const currentArtist = `${currentVersion} Translation`;
+  const currentAlbum = "Seed of Grace Audio Bible";
+
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: currentTitle,
+    artist: currentArtist,
+    album: currentAlbum,
+    artwork: [
+      { src: 'https://raw.githubusercontent.com/pleromatechph/bible-app/main/icon-512.png', sizes: '512x512', type: 'image/png' }
+    ]
+  });
+
+  // Action Handlers for Background Controls
+  navigator.mediaSession.setActionHandler('play', () => {
+    if (audioElement && audioElement.paused) togglePlayPause();
+  });
+  navigator.mediaSession.setActionHandler('pause', () => {
+    if (audioElement && !audioElement.paused) togglePlayPause();
+  });
+  navigator.mediaSession.setActionHandler('previoustrack', () => {
+    navigateToPreviousChapter();
+  });
+  navigator.mediaSession.setActionHandler('nexttrack', () => {
+    navigateToNextChapter();
+  });
+  navigator.mediaSession.setActionHandler('seekbackward', () => {
+    if (audioElement && audioElement.src) {
+      audioElement.currentTime = Math.max(0, audioElement.currentTime - 10);
+    }
+  });
+  navigator.mediaSession.setActionHandler('seekforward', () => {
+    if (audioElement && audioElement.src) {
+      audioElement.currentTime = Math.min(audioElement.duration || 0, audioElement.currentTime + 10);
+    }
+  });
+}
+
 function formatTime(secs) {
   const m = Math.floor(secs / 60);
   const s = Math.floor(secs % 60);
@@ -1742,6 +1792,13 @@ function openBookSelector() {
   if (modalBody) modalBody.innerHTML = html;
   if (selectionModal) selectionModal.classList.add('open');
   if (drawerOverlay) drawerOverlay.classList.add('open');
+
+  setTimeout(() => {
+    const activeItem = modalBody ? modalBody.querySelector('.active-item') : null;
+    if (activeItem) {
+      activeItem.scrollIntoView({ block: 'center', behavior: 'auto' });
+    }
+  }, 0);
 }
 
 if (chapterTabBtn) chapterTabBtn.addEventListener('click', openChapterSelector);
@@ -1763,8 +1820,13 @@ function openChapterSelector() {
 if (closeModalBtn) closeModalBtn.addEventListener('click', () => closeAllModals());
 
 window.onSelectBook = function(bookName) {
-  selectedBook = bibleData.find(b => b.book === bookName);
-  selectedChapter = 1;
+  const foundBook = bibleData.find(b => b.book === bookName);
+  if (foundBook) {
+    selectedBook = foundBook;
+    localStorage.setItem('sog_last_read_book', selectedBook.book);
+    selectedChapter = 1;
+    localStorage.setItem('sog_last_read_chapter', '1');
+  }
   openChapterSelector();
 };
 
@@ -1890,6 +1952,7 @@ async function updateDisplay(forceAutoPlay = false) {
   if (deckSub) deckSub.textContent = `${currentVersion} Translation`;
 
   updateDashboardMetrics();
+  updateMediaSessionMetadata();
   refreshIcons();
 }
 
