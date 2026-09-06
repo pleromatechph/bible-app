@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "456845730631",
+    "project_id": "seed-of-grace-a8850",
+    "storage_bucket": "seed-of-grace-a8850.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:456845730631:android:74e0590a424b69f41be262",
+        "android_client_info": {
+          "package_name": "com.seedofgrace.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "456845730631-3gu7nko6ss90ocac676enq8ujds8neiu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.seedofgrace.app",
+            "certificate_hash": "79f29e19aa727bc332aa48bcda8a35911aa56c60"
+          }
+        },
+        {
+          "client_id": "456845730631-qvm3cgid3bvbi7b44q9ti9hl1eopu8as.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBPC9ffJ4E6WWYquB5mV-yjlwoEffQd5rM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "456845730631-qvm3cgid3bvbi7b44q9ti9hl1eopu8as.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

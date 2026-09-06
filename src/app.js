@@ -413,16 +413,6 @@ function getBookAliases(bookName) {
   return aliases;
 }
 
-function getBookAliases(bookName) {
-  const clean = bookName.toLowerCase().replace(/\s+/g, '');
-  const aliases = [clean];
-  if (clean === 'psalms') aliases.push('psalm', 'psa', 'ps');
-  if (clean === '1kings') aliases.push('1ki', '1kgs', '1king');
-  if (clean === '2kings') aliases.push('2ki', '2kgs', '2king');
-  if (clean === 'james') aliases.push('jas', 'jm');
-  return aliases;
-}
-
 // Header Quick Toggle Button
 if (themeToggleBtn) {
   themeToggleBtn.addEventListener('click', () => {
@@ -1525,20 +1515,31 @@ function renderUserGreetingBanner() {
 let savedAudioPlaybackPosition = 0;
 let isAudioReconnectingState = false;
 
+// Universal Spinner & Slider Wave Controller
 function setAudioReconnectingState(isReconnecting) {
   isAudioReconnectingState = isReconnecting;
   const progressBar = document.getElementById('progressBar');
   const miniPlayBtn = document.getElementById('miniPlayBtn');
   const readerMiniPlayBtn = document.getElementById('readerMiniPlayBtn');
+  const playBtn = document.getElementById('playBtn');
 
   if (isReconnecting) {
+    // 1. Infinite Wave Animation sa Slider
     if (progressBar) progressBar.classList.add('reconnecting');
+    
+    // 2. Loading Spinners sa Mini Players Lamang (I-check muna para hindi ma-reset ang DOM animation)
     const spinnerHTML = `<div class="spinner-ring"></div>`;
-    if (miniPlayBtn) miniPlayBtn.innerHTML = spinnerHTML;
-    if (readerMiniPlayBtn) readerMiniPlayBtn.innerHTML = spinnerHTML;
-
-    const playBtn = document.getElementById('playBtn');
-    if (playBtn) playBtn.innerHTML = `<i data-lucide="play" id="playIcon"></i>`;
+    if (miniPlayBtn && !miniPlayBtn.querySelector('.spinner-ring')) {
+      miniPlayBtn.innerHTML = spinnerHTML;
+    }
+    if (readerMiniPlayBtn && !readerMiniPlayBtn.querySelector('.spinner-ring')) {
+      readerMiniPlayBtn.innerHTML = spinnerHTML;
+    }
+    
+    // 3. Maximized Player Main Button: Naka-Triangle (Play) Icon habang nagle-load
+    if (playBtn) {
+      playBtn.innerHTML = `<i data-lucide="play" id="playIcon"></i>`;
+    }
     refreshIcons();
   } else {
     if (progressBar) progressBar.classList.remove('reconnecting');
@@ -1547,13 +1548,20 @@ function setAudioReconnectingState(isReconnecting) {
 }
 
 function updatePlayIcons(isPlaying) {
-  if (isAudioReconnectingState) return;
-
-  const iconName = isPlaying ? 'pause' : 'play';
   const playBtn = document.getElementById('playBtn');
   const miniPlayBtn = document.getElementById('miniPlayBtn');
   const readerMiniPlayBtn = document.getElementById('readerMiniPlayBtn');
 
+  if (isAudioReconnectingState) {
+    if (playBtn) playBtn.innerHTML = `<i data-lucide="play" id="playIcon"></i>`;
+    const spinnerHTML = `<div class="spinner-ring"></div>`;
+    if (miniPlayBtn && !miniPlayBtn.querySelector('.spinner-ring')) miniPlayBtn.innerHTML = spinnerHTML;
+    if (readerMiniPlayBtn && !readerMiniPlayBtn.querySelector('.spinner-ring')) readerMiniPlayBtn.innerHTML = spinnerHTML;
+    refreshIcons();
+    return;
+  }
+
+  const iconName = isPlaying ? 'pause' : 'play';
   if (playBtn) playBtn.innerHTML = `<i data-lucide="${iconName}" id="playIcon"></i>`;
   if (miniPlayBtn) miniPlayBtn.innerHTML = `<i data-lucide="${iconName}" id="miniPlayIcon"></i>`;
   if (readerMiniPlayBtn) readerMiniPlayBtn.innerHTML = `<i data-lucide="${iconName}" id="readerMiniPlayIcon"></i>`;
@@ -1561,8 +1569,10 @@ function updatePlayIcons(isPlaying) {
   refreshIcons();
 }
 
+// Infinite Auto-Resume Reconnection Loop
 async function attemptAudioAutoResume() {
   if (!audioElement || !audioElement.src || currentVersion !== 'NIV + Audio') return;
+  
   setAudioReconnectingState(true);
   try {
     audioElement.load();
@@ -1572,8 +1582,9 @@ async function attemptAudioAutoResume() {
     await audioElement.play();
     setAudioReconnectingState(false);
   } catch (err) {
-    console.warn("Auto-resume retry scheduled:", err);
-    setTimeout(attemptAudioAutoResume, 3000);
+    console.warn("Reconnection failed, retrying indefinitely...", err);
+    // Infinite Retry kada 2.5 seconds hangga't hindi nakaka-reconnect
+    setTimeout(attemptAudioAutoResume, 2500);
   }
 }
 
@@ -1592,8 +1603,8 @@ function togglePlayPause() {
       updatePlayIcons(true);
       markChapterStarted(selectedBook.book, selectedChapter);
     }).catch(err => {
-      console.log("Audio play error:", err);
-      setAudioReconnectingState(false);
+      console.log("Audio play error, maintaining reconnection state:", err);
+      attemptAudioAutoResume();
     });
   } else {
     audioElement.pause();
@@ -1603,7 +1614,11 @@ function togglePlayPause() {
 }
 
 if (audioElement) {
-  audioElement.addEventListener('play', () => setAudioReconnectingState(false));
+  audioElement.addEventListener('play', () => {
+    if (!audioElement.paused && audioElement.readyState >= 3) {
+      setAudioReconnectingState(false);
+    }
+  });
   audioElement.addEventListener('pause', () => {
     if (!isAudioReconnectingState) updatePlayIcons(false);
   });
@@ -1612,32 +1627,14 @@ if (audioElement) {
     updatePlayIcons(false);
   });
 
-  audioElement.addEventListener('waiting', () => {
-    setAudioReconnectingState(true);
-  });
-
-  audioElement.addEventListener('seeking', () => {
-    setAudioReconnectingState(true);
-  });
-
-  audioElement.addEventListener('stalled', () => {
-    setAudioReconnectingState(true);
-  });
-
+  // Buffering & Network Reconnection Triggers for All Players
+  audioElement.addEventListener('waiting', () => setAudioReconnectingState(true));
+  audioElement.addEventListener('seeking', () => setAudioReconnectingState(true));
+  audioElement.addEventListener('stalled', () => setAudioReconnectingState(true));
+  audioElement.addEventListener('error', () => setAudioReconnectingState(true));
   audioElement.addEventListener('playing', () => {
     setAudioReconnectingState(false);
-  });
-
-  audioElement.addEventListener('canplay', () => {
-    setAudioReconnectingState(false);
-  });
-
-  audioElement.addEventListener('canplaythrough', () => {
-    setAudioReconnectingState(false);
-  });
-
-  audioElement.addEventListener('error', () => {
-    setAudioReconnectingState(false);
+    updatePlayIcons(true);
   });
 
   audioElement.addEventListener('timeupdate', () => {
@@ -1656,25 +1653,6 @@ if (audioElement) {
       if (currentTimeText) currentTimeText.textContent = formatTime(audioElement.currentTime);
       if (durationText) durationText.textContent = formatTime(audioElement.duration);
     }
-  });
-
-  audioElement.addEventListener('timeupdate', () => {
-    if (audioElement.currentTime > 0) {
-      if (isAudioReconnectingState && !audioElement.paused) {
-        setAudioReconnectingState(false);
-      }
-      savedAudioPlaybackPosition = audioElement.currentTime;
-      markChapterStarted(selectedBook.book, selectedChapter);
-    }
-    if (audioElement.duration && !isNaN(audioElement.duration)) {
-      const pct = (audioElement.currentTime / audioElement.duration) * 100;
-      if (progressBar) progressBar.value = pct;
-      if (miniProgressFill) miniProgressFill.style.width = `${pct}%`;
-      if (readerMiniProgressFill) readerMiniProgressFill.style.width = `${pct}%`;
-      if (currentTimeText) currentTimeText.textContent = formatTime(audioElement.currentTime);
-      if (durationText) durationText.textContent = formatTime(audioElement.duration);
-    }
-    updateMediaSessionPositionState();
   });
 
   audioElement.addEventListener('ended', async () => {
@@ -1743,21 +1721,6 @@ if (speedBtn) {
   });
 }
 
-function updateMediaSessionPositionState() {
-  if (!('mediaSession' in navigator) || !('setPositionState' in navigator.mediaSession)) return;
-  if (audioElement && audioElement.duration && !isNaN(audioElement.duration) && isFinite(audioElement.duration)) {
-    try {
-      navigator.mediaSession.setPositionState({
-        duration: audioElement.duration,
-        playbackRate: audioElement.playbackRate || 1.0,
-        position: audioElement.currentTime || 0
-      });
-    } catch (e) {
-      console.warn("MediaSession position state update failed:", e);
-    }
-  }
-}
-
 function updateMediaSessionMetadata() {
   if (!('mediaSession' in navigator)) return;
 
@@ -1774,39 +1737,29 @@ function updateMediaSessionMetadata() {
     ]
   });
 
-  const actions = [
-    ['play', () => { if (audioElement && audioElement.paused) togglePlayPause(); }],
-    ['pause', () => { if (audioElement && !audioElement.paused) togglePlayPause(); }],
-    ['previoustrack', () => navigateToPreviousChapter()],
-    ['nexttrack', () => navigateToNextChapter()],
-    ['seekbackward', (details) => {
-      const skipTime = details.seekOffset || 10;
-      if (audioElement && audioElement.src) {
-        audioElement.currentTime = Math.max(0, audioElement.currentTime - skipTime);
-      }
-    }],
-    ['seekforward', (details) => {
-      const skipTime = details.seekOffset || 10;
-      if (audioElement && audioElement.src) {
-        audioElement.currentTime = Math.min(audioElement.duration || 0, audioElement.currentTime + skipTime);
-      }
-    }],
-    ['seekto', (details) => {
-      if (details.seekTime !== undefined && audioElement && audioElement.duration) {
-        audioElement.currentTime = details.seekTime;
-      }
-    }]
-  ];
-
-  actions.forEach(([action, handler]) => {
-    try {
-      navigator.mediaSession.setActionHandler(action, handler);
-    } catch (error) {
-      console.warn(`MediaSession action ${action} is not supported on this device/browser.`);
+  // Action Handlers for Background Controls
+  navigator.mediaSession.setActionHandler('play', () => {
+    if (audioElement && audioElement.paused) togglePlayPause();
+  });
+  navigator.mediaSession.setActionHandler('pause', () => {
+    if (audioElement && !audioElement.paused) togglePlayPause();
+  });
+  navigator.mediaSession.setActionHandler('previoustrack', () => {
+    navigateToPreviousChapter();
+  });
+  navigator.mediaSession.setActionHandler('nexttrack', () => {
+    navigateToNextChapter();
+  });
+  navigator.mediaSession.setActionHandler('seekbackward', () => {
+    if (audioElement && audioElement.src) {
+      audioElement.currentTime = Math.max(0, audioElement.currentTime - 10);
     }
   });
-
-  updateMediaSessionPositionState();
+  navigator.mediaSession.setActionHandler('seekforward', () => {
+    if (audioElement && audioElement.src) {
+      audioElement.currentTime = Math.min(audioElement.duration || 0, audioElement.currentTime + 10);
+    }
+  });
 }
 
 function formatTime(secs) {
@@ -1999,9 +1952,8 @@ async function updateDisplay(forceAutoPlay = false) {
           setAudioReconnectingState(false);
           updatePlayIcons(true);
         }).catch(err => {
-          console.warn("Autoplay blocked:", err);
-          setAudioReconnectingState(false);
-          updatePlayIcons(false);
+          console.warn("Audio play blocked or offline, maintaining reconnecting state:", err);
+          attemptAudioAutoResume();
         });
       } else {
         updatePlayIcons(false);
@@ -2408,7 +2360,6 @@ function navigateToPreviousChapter() {
       selectedChapter = selectedBook.chapters;
       triggerPageAnimation('page-slide-right');
       updateDisplay();
-      showToast(`Switched to ${selectedBook.book}`);
     }
   }
 }
