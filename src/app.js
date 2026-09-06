@@ -1396,7 +1396,6 @@ if (typeof firebase !== 'undefined' && firebase.auth) {
         localStorage.setItem('sog_user_avatar', user.photoURL);
       }
 
-      showToast(`Welcome, ${localStorage.getItem('sog_user_name') || user.email}!`);
       syncLocalDataToCloud();
       listenToCloudUpdates();
     } else {
@@ -1659,6 +1658,25 @@ if (audioElement) {
     }
   });
 
+  audioElement.addEventListener('timeupdate', () => {
+    if (audioElement.currentTime > 0) {
+      if (isAudioReconnectingState && !audioElement.paused) {
+        setAudioReconnectingState(false);
+      }
+      savedAudioPlaybackPosition = audioElement.currentTime;
+      markChapterStarted(selectedBook.book, selectedChapter);
+    }
+    if (audioElement.duration && !isNaN(audioElement.duration)) {
+      const pct = (audioElement.currentTime / audioElement.duration) * 100;
+      if (progressBar) progressBar.value = pct;
+      if (miniProgressFill) miniProgressFill.style.width = `${pct}%`;
+      if (readerMiniProgressFill) readerMiniProgressFill.style.width = `${pct}%`;
+      if (currentTimeText) currentTimeText.textContent = formatTime(audioElement.currentTime);
+      if (durationText) durationText.textContent = formatTime(audioElement.duration);
+    }
+    updateMediaSessionPositionState();
+  });
+
   audioElement.addEventListener('ended', async () => {
     markChapterFinished(selectedBook.book, selectedChapter);
     if (selectedChapter < selectedBook.chapters) {
@@ -1725,6 +1743,21 @@ if (speedBtn) {
   });
 }
 
+function updateMediaSessionPositionState() {
+  if (!('mediaSession' in navigator) || !('setPositionState' in navigator.mediaSession)) return;
+  if (audioElement && audioElement.duration && !isNaN(audioElement.duration) && isFinite(audioElement.duration)) {
+    try {
+      navigator.mediaSession.setPositionState({
+        duration: audioElement.duration,
+        playbackRate: audioElement.playbackRate || 1.0,
+        position: audioElement.currentTime || 0
+      });
+    } catch (e) {
+      console.warn("MediaSession position state update failed:", e);
+    }
+  }
+}
+
 function updateMediaSessionMetadata() {
   if (!('mediaSession' in navigator)) return;
 
@@ -1741,29 +1774,39 @@ function updateMediaSessionMetadata() {
     ]
   });
 
-  // Action Handlers for Background Controls
-  navigator.mediaSession.setActionHandler('play', () => {
-    if (audioElement && audioElement.paused) togglePlayPause();
-  });
-  navigator.mediaSession.setActionHandler('pause', () => {
-    if (audioElement && !audioElement.paused) togglePlayPause();
-  });
-  navigator.mediaSession.setActionHandler('previoustrack', () => {
-    navigateToPreviousChapter();
-  });
-  navigator.mediaSession.setActionHandler('nexttrack', () => {
-    navigateToNextChapter();
-  });
-  navigator.mediaSession.setActionHandler('seekbackward', () => {
-    if (audioElement && audioElement.src) {
-      audioElement.currentTime = Math.max(0, audioElement.currentTime - 10);
+  const actions = [
+    ['play', () => { if (audioElement && audioElement.paused) togglePlayPause(); }],
+    ['pause', () => { if (audioElement && !audioElement.paused) togglePlayPause(); }],
+    ['previoustrack', () => navigateToPreviousChapter()],
+    ['nexttrack', () => navigateToNextChapter()],
+    ['seekbackward', (details) => {
+      const skipTime = details.seekOffset || 10;
+      if (audioElement && audioElement.src) {
+        audioElement.currentTime = Math.max(0, audioElement.currentTime - skipTime);
+      }
+    }],
+    ['seekforward', (details) => {
+      const skipTime = details.seekOffset || 10;
+      if (audioElement && audioElement.src) {
+        audioElement.currentTime = Math.min(audioElement.duration || 0, audioElement.currentTime + skipTime);
+      }
+    }],
+    ['seekto', (details) => {
+      if (details.seekTime !== undefined && audioElement && audioElement.duration) {
+        audioElement.currentTime = details.seekTime;
+      }
+    }]
+  ];
+
+  actions.forEach(([action, handler]) => {
+    try {
+      navigator.mediaSession.setActionHandler(action, handler);
+    } catch (error) {
+      console.warn(`MediaSession action ${action} is not supported on this device/browser.`);
     }
   });
-  navigator.mediaSession.setActionHandler('seekforward', () => {
-    if (audioElement && audioElement.src) {
-      audioElement.currentTime = Math.min(audioElement.duration || 0, audioElement.currentTime + 10);
-    }
-  });
+
+  updateMediaSessionPositionState();
 }
 
 function formatTime(secs) {
@@ -2349,7 +2392,6 @@ function navigateToNextChapter() {
       selectedChapter = 1;
       triggerPageAnimation('page-slide-left');
       updateDisplay();
-      showToast(`Switched to ${selectedBook.book}`);
     }
   }
 }
