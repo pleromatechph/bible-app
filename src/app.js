@@ -3106,7 +3106,7 @@ if (downloadOtaUpdateBtn) {
 
         downloadOtaUpdateBtn.textContent = "Installing Update...";
         await CapacitorUpdater.set(versionData);
-        showToast("Update installed successfully! Reloading...");
+        await CapacitorUpdater.reload();
       } else {
         showToast("OTA updates are active only on mobile native build.");
         setTimeout(() => {
